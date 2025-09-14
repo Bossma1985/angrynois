@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Angry Birds FUNCIONAL</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background: linear-gradient(
+          to bottom,
+          #87ceeb 0%,
+          #98fb98 70%,
+          #90ee90 100%
+        );
+        overflow: hidden;
+        user-select: none;
+      }
+
+      #gameContainer {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #gameCanvas {
+        border: 2px solid #333;
+        background: linear-gradient(
+          to bottom,
+          #87ceeb 0%,
+          #98fb98 70%,
+          #90ee90 100%
+        );
+        cursor: crosshair;
+      }
+
+      #gameInfo {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+
+      #instructions {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        max-width: 200px;
+      }
+
+      #restartButton {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        display: none;
+      }
+
+      #restartBtn {
+        background: #4caf50;
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+
+      #restartBtn:hover {
+        background: #45a049;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="gameContainer">
+      <canvas id="gameCanvas"></canvas>
+
+      <div id="gameInfo">
+        <div>Objetivos: <span id="targetCount">0</span></div>
+        <div>Tiros: <span id="shotCount">0</span></div>
+        <div>Puntuación: <span id="score">0</span></div>
+      </div>
+
+      <div id="instructions">
+        <strong>Cómo jugar:</strong><br />
+        • Haz clic donde quieres disparar<br />
+        • ¡Disparos ilimitados!<br />
+        • ¡Rompe todo lo que quieras!<br />
+        • Usa "🔄 Restart" para nuevo nivel<br />
+        <em>Objetivo: ¡Diviértete rompiendo!</em>
+      </div>
+
+      <div id="restartButton">
+        <button id="restartBtn">🔄 Restart</button>
+      </div>
+    </div>
+
+    <script>
+      // Configuración simple
+      const CONFIG = {
+        GRAVITY: 0.3,
+        FRICTION: 0.998,
+        BOUNCE: 0.7,
+        PROJECTILE_SIZE: 90,
+        TARGET_SIZE: 150,
+      };
+
+      // Variables globales
+      let canvas, ctx;
+      let gameState = {
+        projectiles: [],
+        targets: [],
+        particles: [],
+        shotsFired: 0,
+        score: 0,
+        isPlaying: true,
+      };
+
+      // Imagen del disparador
+      let launcherImage = null;
+
+      // Cargar imagen del disparador
+      function loadLauncherImage() {
+        const img = new Image();
+        img.onload = () => {
+          launcherImage = img;
+        };
+        img.onerror = () => {
+          console.warn("No se pudo cargar foto1.png, usando forma de fallback");
+          launcherImage = null;
+        };
+        img.src = "images/foto1.png";
+      }
+
+      // Clase Proyectil SIMPLE
+      class Projectile {
+        constructor(x, y, vx, vy) {
+          this.x = x;
+          this.y = y;
+          this.vx = vx;
+          this.vy = vy;
+          this.size = CONFIG.PROJECTILE_SIZE;
+          this.active = true;
+          this.image = null;
+          this.loadImage("images/foto2.png");
+        }
+
+        loadImage(src) {
+          const img = new Image();
+          img.onload = () => {
+            this.image = img;
+          };
+          img.onerror = () => {
+            console.warn(`No se pudo cargar ${src}, usando forma de fallback`);
+            this.image = null;
+          };
+          img.src = src;
+        }
+
+        update() {
+          if (!this.active) return;
+
+          // Física simple
+          this.vy += CONFIG.GRAVITY;
+          this.x += this.vx;
+          this.y += this.vy;
+          this.vx *= CONFIG.FRICTION;
+
+          // Rebote en bordes
+          if (
+            this.x <= this.size / 2 ||
+            this.x >= canvas.width - this.size / 2
+          ) {
+            this.vx *= -CONFIG.BOUNCE;
+            this.x = Math.max(
+              this.size / 2,
+              Math.min(canvas.width - this.size / 2, this.x)
+            );
+          }
+
+          if (this.y >= canvas.height - this.size / 2) {
+            this.vy *= -CONFIG.BOUNCE;
+            this.y = canvas.height - this.size / 2;
+          }
+
+          // Desactivar si está muy lento
+          if (Math.abs(this.vx) < 0.1 && Math.abs(this.vy) < 0.1) {
+            this.active = false;
+          }
+
+          // Eliminar si sale de pantalla
+          if (this.y > canvas.height + 100) {
+            this.active = false;
+          }
+        }
+
+        draw() {
+          if (!this.active) return;
+
+          ctx.save();
+
+          if (this.image) {
+            ctx.drawImage(
+              this.image,
+              this.x - this.size / 2,
+              this.y - this.size / 2,
+              this.size,
+              this.size
+            );
+          } else {
+            // Fallback: círculo azul
+            ctx.fillStyle = "#4169E1";
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        }
+
+        getBounds() {
+          return {
+            x: this.x - this.size / 2,
+            y: this.y - this.size / 2,
+            width: this.size,
+            height: this.size,
+          };
+        }
+      }
+
+      // Clase Objetivo SIMPLE
+      class Target {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.size = CONFIG.TARGET_SIZE;
+          this.active = true;
+          this.health = 100;
+          this.image = null;
+          this.loadImage("images/foto3.png");
+        }
+
+        loadImage(src) {
+          const img = new Image();
+          img.onload = () => {
+            this.image = img;
+          };
+          img.onerror = () => {
+            console.warn(`No se pudo cargar ${src}, usando forma de fallback`);
+            this.image = null;
+          };
+          img.src = src;
+        }
+
+        update() {
+          // Los objetivos son estáticos
+        }
+
+        draw() {
+          if (!this.active) return;
+
+          ctx.save();
+
+          // Indicador de daño
+          if (this.health < 100) {
+            ctx.fillStyle = `rgba(255, 0, 0, ${
+              ((100 - this.health) / 100) * 0.5
+            })`;
+            ctx.fillRect(
+              this.x - this.size / 2,
+              this.y - this.size / 2,
+              this.size,
+              this.size
+            );
+          }
+
+          if (this.image) {
+            ctx.drawImage(
+              this.image,
+              this.x - this.size / 2,
+              this.y - this.size / 2,
+              this.size,
+              this.size
+            );
+          } else {
+            // Fallback: caja roja
+            ctx.fillStyle = "#ff4444";
+            ctx.fillRect(
+              this.x - this.size / 2,
+              this.y - this.size / 2,
+              this.size,
+              this.size
+            );
+            ctx.strokeStyle = "#cc0000";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+              this.x - this.size / 2,
+              this.y - this.size / 2,
+              this.size,
+              this.size
+            );
+          }
+
+          ctx.restore();
+        }
+
+        getBounds() {
+          return {
+            x: this.x - this.size / 2,
+            y: this.y - this.size / 2,
+            width: this.size,
+            height: this.size,
+          };
+        }
+
+        takeDamage(damage) {
+          this.health -= damage;
+          if (this.health <= 0) {
+            this.active = false;
+            gameState.score += 100;
+
+            // Crear partículas
+            for (let i = 0; i < 8; i++) {
+              gameState.particles.push({
+                x: this.x + (Math.random() - 0.5) * 50,
+                y: this.y + (Math.random() - 0.5) * 50,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 60,
+                maxLife: 60,
+              });
+            }
+
+            // Verificar si se destruyeron todos los objetivos
+            checkVictory();
+          }
+        }
+      }
+
+      // Función para verificar victoria
+      function checkVictory() {
+        const activeTargets = gameState.targets.filter(
+          (target) => target.active
+        ).length;
+
+        if (activeTargets === 0) {
+          // ¡Todos los objetivos destruidos!
+          gameState.isPlaying = false;
+          showVictoryMessage();
+        }
+      }
+
+      // Mostrar mensaje de victoria
+      function showVictoryMessage() {
+        // Crear elemento de mensaje
+        const messageDiv = document.createElement("div");
+        messageDiv.id = "victoryMessage";
+        messageDiv.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 10000;
+            border: 3px solid #ff6b6b;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+          ">
+            <div style="font-size: 32px; margin-bottom: 20px;">🎉</div>
+            <div style="color: #ff6b6b; margin-bottom: 10px;">¡El tio Vicent a Perdut!</div>
+            <div style="font-size: 16px; color: #ccc;">Puntuación: ${gameState.score}</div>
+            <div style="font-size: 14px; color: #999; margin-top: 10px;">Reiniciando en 3 segundos...</div>
+          </div>
+        `;
+
+        document.body.appendChild(messageDiv);
+
+        // Reiniciar automáticamente después de 3 segundos
+        setTimeout(() => {
+          document.body.removeChild(messageDiv);
+          restartGame();
+        }, 3000);
+      }
+
+      // Detección de colisiones SIMPLE
+      function checkCollisions() {
+        gameState.projectiles.forEach((projectile) => {
+          if (!projectile.active) return;
+
+          gameState.targets.forEach((target) => {
+            if (!target.active) return;
+
+            const proj = projectile.getBounds();
+            const tar = target.getBounds();
+
+            if (
+              proj.x < tar.x + tar.width &&
+              proj.x + proj.width > tar.x &&
+              proj.y < tar.y + tar.height &&
+              proj.y + proj.height > tar.y
+            ) {
+              // Colisión detectada
+              const impactSpeed = Math.sqrt(
+                projectile.vx * projectile.vx + projectile.vy * projectile.vy
+              );
+              const damage = impactSpeed * 5;
+              target.takeDamage(damage);
+
+              // Rebote del proyectil
+              projectile.vx *= -0.5;
+              projectile.vy *= -0.3;
+              projectile.vx += (Math.random() - 0.5) * 5;
+              projectile.vy += (Math.random() - 0.5) * 5;
+
+              // Destruir proyectil si impacto muy fuerte
+              if (impactSpeed > 10) {
+                projectile.active = false;
+              }
+            }
+          });
+        });
+      }
+
+      // Crear objetivos con posiciones aleatorias
+      function createTargets() {
+        gameState.targets = [];
+
+        // Seleccionar patrón aleatorio
+        const patterns = ["scattered", "cluster", "line", "tower", "corner"];
+        const selectedPattern =
+          patterns[Math.floor(Math.random() * patterns.length)];
+
+        console.log(`Patrón seleccionado: ${selectedPattern}`);
+
+        switch (selectedPattern) {
+          case "scattered":
+            createScatteredPattern();
+            break;
+          case "cluster":
+            createClusterPattern();
+            break;
+          case "line":
+            createLinePattern();
+            break;
+          case "tower":
+            createTowerPattern();
+            break;
+          case "corner":
+            createCornerPattern();
+            break;
+        }
+      }
+
+      // Patrón disperso aleatorio
+      function createScatteredPattern() {
+        for (let i = 0; i < 8; i++) {
+          let x, y;
+          let attempts = 0;
+
+          do {
+            // Área adaptativa al tamaño del canvas
+            const minX = 200;
+            const maxX = Math.max(canvas.width - 100, 400);
+            const minY = 150;
+            const maxY = Math.max(canvas.height - 100, 300);
+
+            x = Math.random() * (maxX - minX) + minX;
+            y = Math.random() * (maxY - minY) + minY;
+
+            const launcherX = 140;
+            const launcherY = canvas.height - 80;
+            const distanceFromLauncher = Math.sqrt(
+              (x - launcherX) ** 2 + (y - launcherY) ** 2
+            );
+
+            attempts++;
+          } while (distanceFromLauncher < 150 && attempts < 50);
+
+          gameState.targets.push(new Target(x, y));
+        }
+      }
+
+      // Patrón en grupo
+      function createClusterPattern() {
+        // Centro adaptativo al tamaño del canvas
+        const minX = 250;
+        const maxX = Math.max(canvas.width - 200, 450);
+        const minY = 200;
+        const maxY = Math.max(canvas.height - 200, 350);
+
+        const centerX = Math.random() * (maxX - minX) + minX;
+        const centerY = Math.random() * (maxY - minY) + minY;
+
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const radius = 60 + Math.random() * 80;
+          const x = centerX + Math.cos(angle) * radius;
+          const y = centerY + Math.sin(angle) * radius;
+
+          gameState.targets.push(new Target(x, y));
+        }
+      }
+
+      // Patrón en línea
+      function createLinePattern() {
+        // Línea adaptativa al tamaño del canvas
+        const minX = 200;
+        const maxX = Math.max(canvas.width - 300, 400);
+        const minY = 150;
+        const maxY = Math.max(canvas.height - 300, 300);
+
+        const startX = Math.random() * (maxX - minX) + minX;
+        const startY = Math.random() * (maxY - minY) + minY;
+        const angle = Math.random() * Math.PI * 2;
+
+        for (let i = 0; i < 8; i++) {
+          const x = startX + Math.cos(angle) * i * 70;
+          const y = startY + Math.sin(angle) * i * 70;
+
+          if (
+            x > 150 &&
+            x < canvas.width - 150 &&
+            y > 150 &&
+            y < canvas.height - 150
+          ) {
+            gameState.targets.push(new Target(x, y));
+          }
+        }
+      }
+
+      // Patrón en torre
+      function createTowerPattern() {
+        // Torre adaptativa al tamaño del canvas
+        const minX = 200;
+        const maxX = Math.max(canvas.width - 200, 400);
+        const baseX = Math.random() * (maxX - minX) + minX;
+        const baseY = Math.max(canvas.height - 120, 200);
+
+        for (let i = 0; i < 8; i++) {
+          const x = baseX + (Math.random() - 0.5) * 100;
+          const y = baseY - i * 55;
+
+          if (y > 100) {
+            // Solo crear si está en pantalla
+            gameState.targets.push(new Target(x, y));
+          }
+        }
+      }
+
+      // Patrón en esquinas
+      function createCornerPattern() {
+        // Esquinas adaptativas al tamaño del canvas
+        const corners = [
+          { x: Math.max(canvas.width - 200, 300), y: 150 }, // Esquina superior derecha
+          {
+            x: Math.max(canvas.width - 200, 300),
+            y: Math.max(canvas.height - 200, 250),
+          }, // Esquina inferior derecha
+          { x: 200, y: Math.max(canvas.height - 200, 250) }, // Esquina inferior izquierda
+          { x: 200, y: 150 }, // Esquina superior izquierda
+        ];
+
+        for (let i = 0; i < 8; i++) {
+          const corner = corners[i % 4];
+          const x = corner.x + (Math.random() - 0.5) * 100;
+          const y = corner.y + (Math.random() - 0.5) * 100;
+
+          gameState.targets.push(new Target(x, y));
+        }
+      }
+
+      // Crear proyectil
+      function createProjectile(targetX, targetY) {
+        const launcherX = 140; // Centro del disparador agrandado
+        const launcherY = canvas.height - 80; // Centro del disparador agrandado
+
+        const dx = targetX - launcherX;
+        const dy = targetY - launcherY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        const power = Math.min(Math.max(distance * 0.8, 15), 40);
+        const vx = (dx / distance) * power;
+        const vy = (dy / distance) * power;
+
+        gameState.projectiles.push(
+          new Projectile(launcherX, launcherY, vx, vy)
+        );
+        gameState.shotsFired++;
+      }
+
+      // Actualizar UI
+      function updateUI() {
+        document.getElementById("targetCount").textContent =
+          gameState.targets.filter((t) => t.active).length;
+        document.getElementById("shotCount").textContent = gameState.shotsFired;
+        document.getElementById("score").textContent = gameState.score;
+      }
+
+      // Event handlers
+      function handleMouseDown(e) {
+        if (!gameState.isPlaying) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        createProjectile(mouseX, mouseY);
+        updateUI();
+      }
+
+      function restartGame() {
+        // Limpiar mensaje de victoria si existe
+        const existingMessage = document.getElementById("victoryMessage");
+        if (existingMessage) {
+          document.body.removeChild(existingMessage);
+        }
+
+        gameState = {
+          projectiles: [],
+          targets: [],
+          particles: [],
+          shotsFired: 0,
+          score: 0,
+          isPlaying: true,
+        };
+
+        document.getElementById("restartButton").style.display = "none";
+        createTargets();
+        updateUI();
+      }
+
+      // Loop principal
+      function gameLoop() {
+        update();
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function update() {
+        if (!gameState.isPlaying) return;
+
+        // Actualizar proyectiles
+        gameState.projectiles = gameState.projectiles.filter((projectile) => {
+          projectile.update();
+          return projectile.active;
+        });
+
+        // Actualizar objetivos
+        gameState.targets.forEach((target) => target.update());
+
+        // Actualizar partículas
+        gameState.particles = gameState.particles.filter((particle) => {
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+          particle.vy += CONFIG.GRAVITY * 0.3;
+          particle.life--;
+          return particle.life > 0;
+        });
+
+        // Verificar colisiones
+        checkCollisions();
+        updateUI();
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dibujar suelo
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+        // Dibujar disparador
+        if (launcherImage) {
+          ctx.drawImage(launcherImage, 80, canvas.height - 140, 120, 120);
+        } else {
+          ctx.fillStyle = "#FFD700";
+          ctx.fillRect(80, canvas.height - 140, 120, 120);
+        }
+
+        // Dibujar objetivos
+        gameState.targets.forEach((target) => target.draw());
+
+        // Dibujar proyectiles
+        gameState.projectiles.forEach((projectile) => projectile.draw());
+
+        // Dibujar partículas
+        gameState.particles.forEach((particle) => {
+          const alpha = particle.life / particle.maxLife;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = "#ff4444";
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      // Inicialización
+      function initGame() {
+        canvas = document.getElementById("gameCanvas");
+        ctx = canvas.getContext("2d");
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Cargar imagen del disparador
+        loadLauncherImage();
+
+        createTargets();
+        updateUI();
+
+        // Event listeners
+        canvas.addEventListener("mousedown", handleMouseDown);
+        document
+          .getElementById("restartBtn")
+          .addEventListener("click", restartGame);
+
+        // Iniciar loop
+        gameLoop();
+      }
+
+      // Iniciar cuando se carga la página
+      window.addEventListener("load", initGame);
+    </script>
+  </body>
+</html>

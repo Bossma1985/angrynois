@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Angry Birds - Juego del Tio Vicent</title>
+    <meta
+      name="description"
+      content="Juego divertido donde disparas al Tio Vicent. ¡Objetivo: Diviértete rompiendo!"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: "Arial", sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .game-container {
+        background: white;
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 2.5em;
+      }
+
+      .game-link {
+        display: inline-block;
+        background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        color: white;
+        padding: 15px 30px;
+        text-decoration: none;
+        border-radius: 50px;
+        font-size: 1.2em;
+        font-weight: bold;
+        margin: 10px;
+        transition: transform 0.3s ease;
+      }
+
+      .game-link:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      .description {
+        color: #666;
+        margin: 20px 0;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-container">
+      <h1>🎯 Angry Birds</h1>
+      <p class="description">
+        ¡Juego divertido donde disparas al Tio Vicent!<br />
+        Objetivo: ¡Diviértete rompiendo todo lo que quieras!
+      </p>
+
+      <a href="game.html" class="game-link"> 🚀 JUGAR AHORA </a>
+
+      <p class="description">
+        <strong>Cómo jugar:</strong><br />
+        • Haz clic donde quieres disparar<br />
+        • ¡Disparos ilimitados!<br />
+        • ¡Rompe todo lo que quieras!<br />
+        • Usa "🔄 Restart" para nuevo nivel
+      </p>
+    </div>
+  </body>
+</html>
