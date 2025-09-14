@@ -102,7 +102,8 @@
       <div id="instructions">
         <strong>Cómo jugar:</strong><br />
         • Haz clic donde quieres disparar<br />
-        • ¡Disparos ilimitados!<br />
+        • ¡Disparos ilimitados por partida!<br />
+        • ¡Máximo 10 partidas!<br />
         • ¡Rompe todo lo que quieras!<br />
         • Usa "🔄 Restart" para nuevo nivel<br />
         <em>Objetivo: ¡Diviértete rompiendo!</em>
@@ -132,6 +133,8 @@
         shotsFired: 0,
         score: 0,
         isPlaying: true,
+        gamesPlayed: 0, // Contador de partidas completadas
+        maxGames: 10, // Límite de 10 partidas
       };
 
       // Imagen del disparador
@@ -366,6 +369,7 @@
 
         if (activeTargets === 0) {
           // ¡Todos los objetivos destruidos!
+          gameState.gamesPlayed++; // Incrementar contador de partidas
           gameState.isPlaying = false;
           showVictoryMessage();
         }
@@ -396,17 +400,73 @@
             <div style="font-size: 32px; margin-bottom: 20px;">🎉</div>
             <div style="color: #ff6b6b; margin-bottom: 10px;">¡El tio Vicent a Perdut!</div>
             <div style="font-size: 16px; color: #ccc;">Puntuación: ${gameState.score}</div>
-            <div style="font-size: 14px; color: #999; margin-top: 10px;">Reiniciando en 3 segundos...</div>
+            <div style="font-size: 16px; color: #4CAF50; margin-top: 10px;">Partidas completadas: ${gameState.gamesPlayed}/${gameState.maxGames}</div>
+            ${gameState.gamesPlayed >= gameState.maxGames ? 
+              '<div style="font-size: 18px; color: #ff9800; margin-top: 15px;">¡Has completado todas las partidas!</div>' : 
+              '<div style="font-size: 14px; color: #999; margin-top: 10px;">Reiniciando en 3 segundos...</div>'
+            }
           </div>
         `;
 
         document.body.appendChild(messageDiv);
 
-        // Reiniciar automáticamente después de 3 segundos
-        setTimeout(() => {
-          document.body.removeChild(messageDiv);
-          restartGame();
-        }, 3000);
+        // Reiniciar automáticamente después de 3 segundos (si no se alcanzó el límite)
+        if (gameState.gamesPlayed < gameState.maxGames) {
+          setTimeout(() => {
+            document.body.removeChild(messageDiv);
+            restartGame();
+          }, 3000);
+        } else {
+          // Si se alcanzó el límite, mostrar mensaje final
+          setTimeout(() => {
+            document.body.removeChild(messageDiv);
+            showFinalMessage();
+          }, 5000);
+        }
+      }
+
+      // Mostrar mensaje final cuando se completan todas las partidas
+      function showFinalMessage() {
+        const finalMessageDiv = document.createElement("div");
+        finalMessageDiv.id = "finalMessage";
+        finalMessageDiv.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            z-index: 10000;
+            border: 4px solid #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+            max-width: 500px;
+          ">
+            <div style="font-size: 48px; margin-bottom: 20px;">🏆</div>
+            <div style="color: #ffd700; margin-bottom: 20px;">¡JUEGO COMPLETADO!</div>
+            <div style="font-size: 20px; margin-bottom: 15px;">Has completado ${gameState.maxGames} partidas</div>
+            <div style="font-size: 18px; margin-bottom: 20px;">Puntuación total: ${gameState.score}</div>
+            <div style="font-size: 16px; color: #ccc; margin-bottom: 20px;">¡Felicitaciones por completar el desafío!</div>
+            <button onclick="location.reload()" style="
+              background: #4CAF50;
+              color: white;
+              border: none;
+              padding: 15px 30px;
+              border-radius: 10px;
+              font-size: 18px;
+              font-weight: bold;
+              cursor: pointer;
+              margin-top: 10px;
+            ">🔄 JUGAR DE NUEVO</button>
+          </div>
+        `;
+        
+        document.body.appendChild(finalMessageDiv);
       }
 
       // Detección de colisiones SIMPLE
@@ -647,8 +707,10 @@
           targets: [],
           particles: [],
           shotsFired: 0,
-          score: 0,
+          score: gameState.score, // Mantener la puntuación acumulada
           isPlaying: true,
+          gamesPlayed: gameState.gamesPlayed, // Mantener el contador de partidas
+          maxGames: gameState.maxGames, // Mantener el límite
         };
 
         document.getElementById("restartButton").style.display = "none";
